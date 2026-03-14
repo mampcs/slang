@@ -320,6 +320,7 @@ warning split-distweight-op SplitDistWeightOp "split dist weight operator is not
 warning nested-solve-before SolveBeforeDisallowed "constraint ordering directive is not allowed within a nested constraint block"
 warning misplaced-trailing-separator MisplacedTrailingSeparator "misplaced trailing '{}'"
 warning qualifiers-on-out-of-block QualifiersOnOutOfBlock "qualifiers are not allowed on out-of-block method definitions"
+warning package-import-in-class PackageImportInClass "package import not allowed in class declaration"
 note NoteToMatchThis "to match this '{}'"
 note NoteLastBlockStarted "last complete block started here"
 note NoteLastBlockEnded "and ended here"
@@ -1282,7 +1283,8 @@ group default = { real-underflow real-overflow vector-overflow int-overflow unco
                   seq-no-match case-too-complex nested-solve-before dynamic-non-procedural
                   nonstandard-string-concat nested-comment multi-write read-write mixed-var-assigns
                   multiple-cont-assigns multiple-always-assigns misplaced-trailing-separator
-                  qualifiers-on-out-of-block member-impl-not-found shift-count-overflow shift-count-negative }
+                  qualifiers-on-out-of-block member-impl-not-found shift-count-overflow shift-count-negative
+                  package-import-in-class }
 
 group extra = { empty-member empty-stmt dup-import pointless-void-cast case-gen-none case-gen-dup
                 unused-result format-real ignored-slice task-ignored width-trunc dup-attr event-const
