@@ -438,7 +438,7 @@ NameSyntax& Parser::parseForeachLoopVariable() {
 
 ForeachLoopListSyntax& Parser::parseForeachLoopVariables() {
     auto openParen = expect(TokenKind::OpenParenthesis);
-    auto& arrayName = parseName(NameOptions::ForeachName);
+    auto& arrayName = parseForeachArrayExpression();
 
     if (arrayName.kind == SyntaxKind::IdentifierSelectName)
         addDiag(diag::NonstandardForeach, arrayName.sourceRange());

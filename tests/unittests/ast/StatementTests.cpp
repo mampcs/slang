@@ -1577,6 +1577,59 @@ endclass
     CHECK(diags[0].code == diag::NonstandardForeach);
 }
 
+TEST_CASE("foreach loop with function call as array name") {
+    auto tree = SyntaxTree::fromText(R"(
+module top;
+  typedef struct packed {
+    bit [5:0] c;
+    bit [0:0] b;
+    bit [1:0] p;
+  } ps;
+
+  class c1;
+    ps da1[$];
+  endclass
+
+  class c2;
+    static local c2 m_self;
+    c1 da2[$];
+    static function c2 self();
+      return m_self;
+    endfunction: self
+  endclass
+
+  task t;
+    ps da3[$];
+    foreach(c2::self().da2[t_id]) begin
+      da3 = {da3, c2::self().da2[t_id].da1};
+    end
+  endtask
+endmodule
+)");
+
+    Compilation compilation;
+    compilation.addSyntaxTree(tree);
+    NO_COMPILATION_ERRORS;
+}
+
+TEST_CASE("foreach loop intermediate bracket followed by invocation") {
+    // Covers the OpenParenthesis branch (line 832) in parseForeachArrayExpression's
+    // OpenBracket handler: an intermediate [n] whose look-ahead token is '(' causes
+    // the bracket to be consumed as an element-select and parsing continues into the
+    // invocation.  Semantically ill-typed (an int element is not callable) so only
+    // parse diagnostics are checked; undeclared/type errors are semantic, not parse.
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    initial begin
+        foreach(f()[0]()[i]) begin
+        end
+    end
+endmodule
+)");
+
+    CHECK(tree->diagnostics().empty());
+}
+
 TEST_CASE("for loop expression error checking") {
     auto tree = SyntaxTree::fromText(R"(
 module m;
