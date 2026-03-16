@@ -104,6 +104,8 @@ void Driver::addStandardArgs() {
     cmdLine.add("--allow-macro-trailing-space", options.allowMacroTrailingSpace,
                 "If true, the preprocessor will allow trailing whitespaces after the continuation "
                 "character in a macro definition");
+    cmdLine.add("--show-parsed-files", options.showParsedFiles,
+                "Print the name and kind of each file as it is parsed.");
 
     // Legacy vendor commands support
     cmdLine.add(
@@ -953,7 +955,53 @@ void Driver::optionallyWriteDepFiles() {
 }
 
 bool Driver::parseAllSources() {
-    syntaxTrees = sourceLoader.loadAndParseSources(createParseOptionBag());
+    Bag bag;
+
+    // Declare cb outside the if block so the function_ref stored in bag remains
+    // valid through loadAndParseSources (which may invoke it from worker threads).
+    std::function<void(BufferID, bool, bool)> cb;
+    if (options.showParsedFiles == true) {
+        cb = [&](BufferID buf, bool isBack, bool isSkip) {
+            std::string_view kind;
+            switch (sourceManager.getBufferKind(buf)) {
+                case SourceManager::BufferKind::LibraryFile:
+                    kind = "library";
+                    break;
+                case SourceManager::BufferKind::LibraryMap:
+                    kind = "libmap";
+                    break;
+                case SourceManager::BufferKind::DesignFile:
+                    kind = "design";
+                    break;
+                case SourceManager::BufferKind::IncludeFile:
+                    kind = "include";
+                    break;
+                default:
+                    kind = "";
+                    break;
+            }
+            auto path = sourceManager.getFullPath(buf).string();
+            std::string msg;
+            if (isBack)
+                msg = fmt::format("Back to file '{}'.\n", path);
+            else
+                msg = fmt::format("{} {} file '{}'.\n",
+                                  isSkip ? "Skipping" : "Parsing", kind, path);
+            std::unique_lock<std::shared_mutex> lock(parsedFilesMutex);
+            parsedFiles.push_back(std::move(msg));
+        };
+        addParseOptions(bag, cb);
+    }
+    else {
+        addParseOptions(bag);
+    }
+
+    syntaxTrees = sourceLoader.loadAndParseSources(bag);
+
+    std::shared_lock<std::shared_mutex> lock(parsedFilesMutex);
+    for (auto& msg : parsedFiles)
+        OS::print(msg);
+
     if (!reportLoadErrors())
         return false;
 
@@ -980,7 +1028,8 @@ Bag Driver::createOptionBag() const {
     return bag;
 }
 
-void Driver::addParseOptions(Bag& bag) const {
+void Driver::addParseOptions(Bag& bag,
+                             function_ref<void(BufferID, bool, bool)> bufferChangeCB) const {
     SourceOptions soptions;
     soptions.numThreads = options.numThreads;
     soptions.singleUnit = options.singleUnit == true;
@@ -997,6 +1046,8 @@ void Driver::addParseOptions(Bag& bag) const {
         ppoptions.maxIncludeDepth = *options.maxIncludeDepth;
     for (const auto& d : options.ignoreDirectives)
         ppoptions.ignoreDirectives.emplace(d);
+    if (bufferChangeCB)
+        ppoptions.bufferChangeCB = bufferChangeCB;
 
     LexerOptions loptions;
     loptions.languageVersion = languageVersion;

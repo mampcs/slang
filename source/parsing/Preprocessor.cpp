@@ -126,6 +126,8 @@ void Preprocessor::pushSource(SourceBuffer buffer) {
         }
     }
 
+    if (options.bufferChangeCB && includeDepth > 0)
+        options.bufferChangeCB(buffer.id, false, false);
     lexerStack.emplace_back(
         std::make_unique<Lexer>(buffer, alloc, diagnostics, sourceManager, lexerOptions));
 
@@ -148,6 +150,7 @@ void Preprocessor::pushSource(SourceBuffer buffer) {
 }
 
 bool Preprocessor::popSource() {
+    auto prevIncludeDepth = includeDepth;
     if (includeDepth)
         includeDepth--;
 
@@ -179,6 +182,8 @@ bool Preprocessor::popSource() {
     headerGuardStack.pop_back();
 
     lexerStack.pop_back();
+    if (options.bufferChangeCB && !lexerStack.empty())
+        options.bufferChangeCB(lexerStack.back()->getBufferId(), prevIncludeDepth > 0, false);
 
     if (!pendingMacroFrames.empty() && lexerStack.size() == pendingMacroFrames.back().lexerDepth) {
         auto& frame = pendingMacroFrames.back();
@@ -672,6 +677,9 @@ Trivia Preprocessor::handleIncludeDirective(Token directive) {
                 .buffer = *buffer,
                 .isSystem = isSystem,
             });
+        }
+        else if (options.bufferChangeCB) {
+            options.bufferChangeCB(buffer->id, false, true);
         }
     }
 

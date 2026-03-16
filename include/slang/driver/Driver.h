@@ -8,6 +8,8 @@
 //------------------------------------------------------------------------------
 #pragma once
 
+#include <shared_mutex>
+
 #include "slang/ast/Compilation.h"
 #include "slang/diagnostics/DiagnosticClient.h"
 #include "slang/diagnostics/DiagnosticEngine.h"
@@ -17,6 +19,7 @@
 #include "slang/text/SourceManager.h"
 #include "slang/util/Bag.h"
 #include "slang/util/CommandLine.h"
+#include "slang/util/Function.h"
 #include "slang/util/LanguageVersion.h"
 #include "slang/util/OS.h"
 #include "slang/util/Util.h"
@@ -170,6 +173,10 @@ public:
         /// If true, the preprocessor will allow trailing spaces after the continuation character
         /// in macro definitions.
         std::optional<bool> allowMacroTrailingSpace;
+
+        /// If true, the preprocessor will print the name and kind of each file
+        /// as it is parsed.
+        std::optional<bool> showParsedFiles;
 
         /// @}
         /// @name Parsing
@@ -462,7 +469,8 @@ private:
     bool parseUnitListing(std::string_view text);
     std::string parseMapKeywordVersion(std::string_view value);
     void addLibraryFiles(std::string_view pattern);
-    void addParseOptions(Bag& bag) const;
+    void addParseOptions(Bag& bag,
+                         function_ref<void(BufferID, bool, bool)> bufferChangeCB = nullptr) const;
     void addCompilationOptions(Bag& bag) const;
     bool reportLoadErrors();
 
@@ -471,6 +479,12 @@ private:
     std::vector<std::tuple<std::string_view, std::string_view, std::string_view>>
         translateOffFormats;
     std::unique_ptr<JsonWriter> jsonWriter;
+
+    /// For storing the list of file parsing strings.
+    std::vector<std::string> parsedFiles;
+
+    /// This mutex is specifically for protecting access to parsedFilesOutput
+    mutable std::shared_mutex parsedFilesMutex;
 };
 
 } // namespace slang::driver
