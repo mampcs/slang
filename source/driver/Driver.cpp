@@ -985,8 +985,8 @@ bool Driver::parseAllSources() {
             if (isBack)
                 msg = fmt::format("Back to file '{}'.\n", path);
             else
-                msg = fmt::format("{} {} file '{}'.\n",
-                                  isSkip ? "Skipping" : "Parsing", kind, path);
+                msg = fmt::format("{} {} file '{}'.\n", isSkip ? "Skipping" : "Parsing", kind,
+                                  path);
             std::unique_lock<std::shared_mutex> lock(parsedFilesMutex);
             parsedFiles.push_back(std::move(msg));
         };
