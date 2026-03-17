@@ -187,6 +187,11 @@ If true, the preprocessor will allow trailing whitespaces after the continuation
 in a macro definition. The trailing whitespaces are only allowed after the first line of the
 macro definition.
 
+`--allow-missing-protected-scope-end`
+If true, the preprocessor will assume that a missing end of scope token for a
+module/program/package/class inside an include file with protected code has the end of scope
+token was inside the protected code.
+
 `--translate-off-format <common>,<start>,<end>`
 
 Specify the format of a "translate off" directive in a comment that denotes a span

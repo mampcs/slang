@@ -63,6 +63,11 @@ struct SLANG_EXPORT PreprocessorOptions {
 
     /// A list of mappings from file patterns to language keyword versions.
     std::vector<std::pair<std::string, KeywordVersion>> keywordMapping;
+
+    /// If true, the preprocessor will assume that a missing end of scope token for a
+    /// module/program/package/class inside an include file with protected code has the
+    /// end of scope token was inside the protected code.
+    bool allowMissingProtectedScopeEnd = false;
 };
 
 /// Metadata about an include directive that was invoked.
@@ -130,6 +135,25 @@ public:
     /// parsing a design element so that the preprocessor can enforce rules about
     /// where directives may appear.
     void popDesignElementStack() { designElementDepth--; }
+
+    /// Notify the preprocessor that parsing has entered an outer scope element
+    /// (module/program/package/class). The flag is only set when inside an included file,
+    /// as it is used to detect a missing end-of-scope token that may be hidden inside
+    /// an encrypted block at the end of the file.
+    void enterOuterScope() { insideOuterScope = includeDepth > 0; }
+
+    /// Notify the preprocessor that parsing has exited an outer scope element
+    /// (module/program/package/class).
+    void exitOuterScope() { insideOuterScope = false; }
+
+    /// Notify the preprocessor that the current file contains protected code. The flag
+    /// is only set when inside an included file.
+    void setHasProtectedCode() { hasProtectedCode = includeDepth > 0; }
+
+    /// Returns true if the parser should treat a missing scope end token as non-fatal.
+    /// This is the case when an included file has protected code and the end-of-scope
+    /// token for the enclosing module/program/package/class was not found.
+    bool shouldIgnoreMissingEndToken() const { return ignoreMissingEndToken; }
 
     /// Gets the currently active time scale value, if any has been set by the user.
     const std::optional<TimeScale>& getTimeScale() const { return activeTimeScale; }
@@ -478,6 +502,12 @@ private:
     // Per-file header guard detection state; one entry per active lexer.
     SmallVector<HeaderGuardInfo, 2> headerGuardStack;
 
+    // keep track of nested (via includes) outer scopes (module/program/package/class).
+    SmallVector<bool, 2> insideOuterScopeStack;
+
+    // keep track of nested (via includes) files that have protected code.
+    SmallVector<bool, 2> protectedCodeStack;
+
     // map from macro name to macro definition
     flat_hash_map<std::string_view, MacroDef> macros;
 
@@ -529,6 +559,9 @@ private:
     TokenKind defaultNetType = TokenKind::WireKeyword;
     TokenKind unconnectedDrive = TokenKind::Unknown;
     bool cellDefine = false;
+    bool insideOuterScope = false;
+    bool hasProtectedCode = false;
+    bool ignoreMissingEndToken = false;
 
     int designElementDepth = 0;
     uint32_t includeDepth = 0;

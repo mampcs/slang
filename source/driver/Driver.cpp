@@ -104,6 +104,10 @@ void Driver::addStandardArgs() {
     cmdLine.add("--allow-macro-trailing-space", options.allowMacroTrailingSpace,
                 "If true, the preprocessor will allow trailing whitespaces after the continuation "
                 "character in a macro definition");
+    cmdLine.add("--allow-missing-protected-scope-end", options.allowMissingProtectedScopeEnd,
+                "If true, the preprocessor will assume that a missing end of scope token for a "
+                "module/program/package/class inside an include file with protected code has the "
+                "end of scope token was inside the protected code");
 
     // Legacy vendor commands support
     cmdLine.add(
@@ -978,6 +982,8 @@ void Driver::addParseOptions(Bag& bag) const {
         ppoptions.maxIncludeDepth = *options.maxIncludeDepth;
     for (const auto& d : options.ignoreDirectives)
         ppoptions.ignoreDirectives.emplace(d);
+    if (options.allowMissingProtectedScopeEnd.has_value())
+        ppoptions.allowMissingProtectedScopeEnd = *options.allowMissingProtectedScopeEnd;
 
     LexerOptions loptions;
     loptions.languageVersion = languageVersion;

@@ -1275,3 +1275,37 @@ TEST_CASE("Driver file preprocess with source info") {
     CHECK(contains(output, "mod1.sv:1\nmodule mod1"));
     CHECK(contains(output, "test.sv:15\n"));
 }
+
+TEST_CASE("Driver missing protected scope end -- error without flag") {
+    auto guard = OS::captureOutput();
+
+    Driver driver;
+    driver.addStandardArgs();
+
+    auto testDir = findTestDir();
+    auto args = fmt::format("testfoo \"{0}missing_end_top.sv\"", testDir);
+    CHECK(driver.parseCommandLine(args));
+    CHECK(driver.processOptions());
+    CHECK(driver.parseAllSources());
+    CHECK(!driver.reportParseDiags());
+
+    CHECK(stderrContains("expected 'endmodule'"));
+}
+
+TEST_CASE("Driver missing protected scope end -- suppressed with flag") {
+    auto guard = OS::captureOutput();
+
+    Driver driver;
+    driver.addStandardArgs();
+
+    auto testDir = findTestDir();
+    auto args = fmt::format("testfoo \"{0}missing_end_top.sv\" --allow-missing-protected-scope-end",
+                            testDir);
+    CHECK(driver.parseCommandLine(args));
+    CHECK(driver.processOptions());
+    CHECK(driver.parseAllSources());
+    CHECK(driver.runFullCompilation());
+
+    CHECK(stdoutContains("Build succeeded"));
+    CHECK(!stderrContains("expected 'endmodule'"));
+}

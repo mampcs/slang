@@ -502,6 +502,8 @@ void Preprocessor::handleEncryptedRegion(Token keyword, const PragmaExpressionSy
                                                     /* legacyProtectedMode */ false);
     addDiag(diag::ProtectedEnvelope, token.location());
 
+    setHasProtectedCode();
+
     skippedTokens.push_back(token);
 }
 

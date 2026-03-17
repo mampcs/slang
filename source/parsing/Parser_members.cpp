@@ -57,6 +57,7 @@ MemberSyntax& Parser::parseModule(AttrList attributes, SyntaxKind parentKind,
     // Tell the preprocessor that we're inside a design element for the duration of this function.
     auto& pp = getPP();
     pp.pushDesignElementStack();
+    pp.enterOuterScope();
 
     auto& header = parseModuleHeader();
     auto endKind = getModuleEndKind(header.moduleKeyword.kind);
@@ -90,6 +91,7 @@ MemberSyntax& Parser::parseModule(AttrList attributes, SyntaxKind parentKind,
 
     currentDefinitionKind = savedDefinitionKind;
     pp.popDesignElementStack();
+    pp.exitOuterScope();
 
     auto endName = parseNamedBlockClause();
     checkBlockNames(header.name, endName);
@@ -104,6 +106,7 @@ MemberSyntax& Parser::parseModule(AttrList attributes, SyntaxKind parentKind,
 AnonymousProgramSyntax& Parser::parseAnonymousProgram(AttrList attributes) {
     auto& pp = getPP();
     pp.pushDesignElementStack();
+    pp.enterOuterScope();
 
     auto keyword = consume();
     auto semi = expect(TokenKind::Semicolon);
@@ -116,6 +119,7 @@ AnonymousProgramSyntax& Parser::parseAnonymousProgram(AttrList attributes) {
         });
 
     pp.popDesignElementStack();
+    pp.exitOuterScope();
 
     return factory.anonymousProgram(attributes, keyword, semi, members, endkeyword);
 }
@@ -522,7 +526,14 @@ std::span<TMember*> Parser::parseMemberList(TokenKind endKind, Token& endToken,
     if (anyLocalModules)
         moduleDeclStack.pop_back();
 
-    endToken = expect(endKind);
+    auto& pp = getPP();
+    if (pp.shouldIgnoreMissingEndToken()) {
+        endToken = missingToken(endKind, peek().location());
+        consume();
+    }
+    else {
+        endToken = expect(endKind);
+    }
     return members.copy(alloc);
 }
 
@@ -1121,6 +1132,9 @@ ClassDeclarationSyntax& Parser::parseClassDeclaration(AttrList attributes,
                                                       Token virtualOrInterface) {
     auto classKeyword = consume();
 
+    auto& pp = getPP();
+    pp.enterOuterScope();
+
     const bool isIfaceClass = virtualOrInterface.kind == TokenKind::InterfaceKeyword;
     ClassSpecifierSyntax* finalSpecifier = nullptr;
     if (!isIfaceClass) {
@@ -1188,6 +1202,8 @@ ClassDeclarationSyntax& Parser::parseClassDeclaration(AttrList attributes,
         [this, isIfaceClass, extendsClause](SyntaxKind, bool&) {
             return parseClassMember(isIfaceClass, extendsClause != nullptr);
         });
+
+    pp.exitOuterScope();
 
     auto endBlockName = parseNamedBlockClause();
     checkBlockNames(name, endBlockName);

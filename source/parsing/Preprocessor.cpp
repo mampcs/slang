@@ -148,8 +148,14 @@ void Preprocessor::pushSource(SourceBuffer buffer) {
 }
 
 bool Preprocessor::popSource() {
-    if (includeDepth)
+    if (includeDepth) {
         includeDepth--;
+
+        insideOuterScope = insideOuterScopeStack.back();
+        insideOuterScopeStack.pop_back();
+        hasProtectedCode = protectedCodeStack.back();
+        protectedCodeStack.pop_back();
+    }
 
     if (!keywordVersionStack.empty() &&
         keywordVersionStack.back().source != KeywordVersionState::Source::Directive) {
@@ -550,6 +556,11 @@ Token Preprocessor::nextRaw() {
     };
 
     auto token = getNext();
+
+    // Determine if we should return the EndOfFile token for an include file.
+    ignoreMissingEndToken = (token.kind == TokenKind::EndOfFile) && insideOuterScope &&
+                            hasProtectedCode && options.allowMissingProtectedScopeEnd;
+
     if (token.kind != TokenKind::EndOfFile)
         return token;
 
@@ -557,6 +568,14 @@ Token Preprocessor::nextRaw() {
     // through to loop to merge trivia
     if (popSource())
         return token;
+
+    // If the include file had protected code and we are in an outer scope for which we did not
+    // find the end of the scope token, then we will return the EndOfFile so that the upstream
+    // code can consider this to be a missing end of scope token (either because it was missing
+    // completely or because it was part of the encrypted block that we are not able to process).
+    if (ignoreMissingEndToken) {
+        return token;
+    }
 
     // Rare case: we have an EoF from an include file... we don't want to return
     // that one, but we do want to merge its trivia with whatever comes next.
@@ -663,6 +682,11 @@ Trivia Preprocessor::handleIncludeDirective(Token directive) {
         else if (includeOnceHeaders.find(buffer->data.data()) == includeOnceHeaders.end()) {
             includeDepth++;
             pushSource(*buffer);
+
+            insideOuterScopeStack.emplace_back(insideOuterScope);
+            insideOuterScope = false;
+            protectedCodeStack.emplace_back(hasProtectedCode);
+            hasProtectedCode = false;
 
             includeDirectives.push_back(IncludeMetadata{
                 .syntax = syntax,
@@ -1249,6 +1273,8 @@ std::pair<Trivia, Trivia> Preprocessor::handleProtectedDirective(Token directive
     skipped.push_back(token);
 
     addDiag(diag::ProtectedEnvelope, token.location());
+
+    setHasProtectedCode();
 
     Trivia skippedTrivia;
     if (!skipped.empty())
